@@ -16,12 +16,14 @@ export type WalletLink = {
   confidence: Confidence;
   tx?: string;
   amountSol?: number;
+  kind?: "funding" | "shared-funder" | "co-signer" | "early-wallet" | "token-outflow" | "other";
 };
 
 export type CreatorLaunch = {
   mint: string;
   firstSeen?: number | null;
   evidence: string;
+  signature?: string | null;
 };
 
 export type TokenMeta = {
@@ -42,11 +44,25 @@ export type HolderStats = {
   accountsChecked: number;
 };
 
+export type EarlyWallet = {
+  wallet: string;
+  firstSeen: number | null;
+  signature: string;
+  tokenDelta: number | null;
+  fundingSource: string | null;
+  fundingSignature: string | null;
+  sharedCreatorFunder: boolean;
+};
+
 export type ScanResult = {
   scanId: string;
   generatedAt: string;
   network: "mainnet-beta";
   token: TokenMeta;
+  launch: {
+    platform: "pump.fun" | "unknown";
+    creationConfidence: Confidence;
+  };
   fingerprint: {
     clusterId: string;
     rugDna: string;
@@ -60,18 +76,23 @@ export type ScanResult = {
     fundingSignature: string | null;
   };
   holders: HolderStats;
+  earlyWallets: EarlyWallet[];
   links: WalletLink[];
   previousLaunches: CreatorLaunch[];
   evidence: Evidence[];
   risk: {
-    score: number;
-    label: "LOW" | "GUARDED" | "HIGH" | "SEVERE";
+    score: number | null;
+    label: "LOW" | "GUARDED" | "HIGH" | "SEVERE" | "UNRESOLVED";
     reasons: string[];
+    dataConfidence: number;
+    unknowns: string[];
   };
   coverage: {
     provider: "helius" | "solana-rpc";
     signaturesInspected: number;
     transactionsParsed: number;
+    creatorSignaturesInspected: number;
+    earlyTransactionsParsed: number;
     notes: string[];
   };
 };
