@@ -16,17 +16,70 @@ function rpcUrl() {
   return process.env.SOLANA_RPC_URL?.trim() || DEFAULT_RPC;
 }
 
+const RPC_MIN_INTERVAL_MS = Math.max(80, Number(process.env.RUGPRINT_RPC_MIN_INTERVAL_MS || 150));
+const RPC_MAX_RETRIES = Math.max(2, Math.min(6, Number(process.env.RUGPRINT_RPC_MAX_RETRIES || 4)));
+let rpcStartChain: Promise<void> = Promise.resolve();
+let lastRpcStart = 0;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForRpcSlot() {
+  let release!: () => void;
+  const previous = rpcStartChain;
+  rpcStartChain = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  const wait = Math.max(0, lastRpcStart + RPC_MIN_INTERVAL_MS - Date.now());
+  if (wait) await sleep(wait);
+  lastRpcStart = Date.now();
+  release();
+}
+
 async function rpc<T>(method: string, params: unknown): Promise<T> {
-  const res = await fetch(rpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    cache: "no-store"
-  });
-  if (!res.ok) throw new Error(`RPC ${res.status}: ${await res.text()}`);
-  const body = await res.json();
-  if (body.error) throw new Error(body.error.message || "Solana RPC error");
-  return body.result as T;
+  let lastError = "Solana RPC error";
+
+  for (let attempt = 0; attempt <= RPC_MAX_RETRIES; attempt++) {
+    await waitForRpcSlot();
+    const res = await fetch(rpcUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      cache: "no-store"
+    });
+
+    if (res.ok) {
+      const body = await res.json();
+      if (body.error) {
+        const msg = body.error.message || "Solana RPC error";
+        const rateLimited = body.error.code === 429 || /too many requests|rate.?limit/i.test(msg);
+        if (!rateLimited) throw new Error(msg);
+        lastError = msg;
+      } else {
+        return body.result as T;
+      }
+    } else {
+      const text = await res.text();
+      lastError = `RPC ${res.status}: ${text}`;
+      if (res.status !== 429 && res.status < 500) throw new Error(lastError);
+
+      if (attempt < RPC_MAX_RETRIES) {
+        const retryAfter = Number(res.headers.get("retry-after") || "0");
+        const backoff = retryAfter > 0
+          ? retryAfter * 1000
+          : Math.min(5000, 450 * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);
+        await sleep(backoff);
+        continue;
+      }
+    }
+
+    if (attempt < RPC_MAX_RETRIES) {
+      const backoff = Math.min(5000, 450 * Math.pow(2, attempt)) + Math.floor(Math.random() * 250);
+      await sleep(backoff);
+    }
+  }
+
+  throw new Error(`${lastError}. RugPrint retried the provider but it is still rate-limiting this scan.`);
 }
 
 function isPubkey(value: string) {
@@ -74,7 +127,10 @@ function keyString(k: ParsedTx["transaction"]["message"]["accountKeys"][number])
 
 function txSignature(tx: ParsedTx) { return tx.transaction.signatures[0] || ""; }
 
-async function getSignatures(address: string, pageLimit = 5) {
+const signatureCache = new Map<string, Promise<Sig[]>>();
+const txCache = new Map<string, Promise<ParsedTx | null>>();
+
+async function getSignaturesUncached(address: string, pageLimit = 5) {
   const all: Sig[] = [];
   let before: string | undefined;
   for (let p = 0; p < pageLimit; p++) {
@@ -87,8 +143,28 @@ async function getSignatures(address: string, pageLimit = 5) {
   return all;
 }
 
+async function getSignatures(address: string, pageLimit = 5) {
+  const key = `${address}:${pageLimit}`;
+  const cached = signatureCache.get(key);
+  if (cached) return cached;
+  const pending = getSignaturesUncached(address, pageLimit).catch(error => {
+    signatureCache.delete(key);
+    throw error;
+  });
+  signatureCache.set(key, pending);
+  return pending;
+}
+
 async function getTx(signature: string): Promise<ParsedTx | null> {
-  return rpc<ParsedTx | null>("getTransaction", [signature, { commitment: "confirmed", encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]);
+  const cached = txCache.get(signature);
+  if (cached) return cached;
+  const pending = rpc<ParsedTx | null>("getTransaction", [signature, { commitment: "confirmed", encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }])
+    .catch(error => {
+      txCache.delete(signature);
+      throw error;
+    });
+  txCache.set(signature, pending);
+  return pending;
 }
 
 async function getTokenMeta(mint: string): Promise<TokenMeta> {
@@ -290,10 +366,10 @@ function scoreRisk(meta: TokenMeta, holders: HolderStats, links: WalletLink[], p
 export async function analyzeMint(mint: string): Promise<ScanResult> {
   if (!isPubkey(mint)) throw new Error("That does not look like a valid Solana address.");
 
-  const maxPages = Math.max(1, Math.min(10, Number(process.env.RUGPRINT_MAX_SIGNATURE_PAGES || 5)));
-  const creatorPages = Math.max(1, Math.min(5, Number(process.env.RUGPRINT_CREATOR_SIGNATURE_PAGES || 3)));
-  const historyTxSample = Math.max(60, Math.min(300, Number(process.env.RUGPRINT_HISTORY_TX_SAMPLE || 75)));
-  const earlyTxSample = Math.max(15, Math.min(80, Number(process.env.RUGPRINT_EARLY_TX_SAMPLE || 20)));
+  const maxPages = Math.max(1, Math.min(10, Number(process.env.RUGPRINT_MAX_SIGNATURE_PAGES || 3)));
+  const creatorPages = Math.max(1, Math.min(5, Number(process.env.RUGPRINT_CREATOR_SIGNATURE_PAGES || 2)));
+  const historyTxSample = Math.max(60, Math.min(300, Number(process.env.RUGPRINT_HISTORY_TX_SAMPLE || 40)));
+  const earlyTxSample = Math.max(15, Math.min(80, Number(process.env.RUGPRINT_EARLY_TX_SAMPLE || 16)));
 
   const [meta, holders, sigs] = await Promise.all([getTokenMeta(mint), getHolderStats(mint), getSignatures(mint, maxPages)]);
   if (!sigs.length) throw new Error("No confirmed transactions were found for this address. Check the contract address and network.");
@@ -305,8 +381,8 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
   let parsedCount = 0;
 
   // Search the oldest mint-address activity for a transaction that actually initialises this mint.
-  const oldestCandidates = sigs.slice(-Math.min(30, sigs.length)).reverse();
-  const oldestTxs = await boundedMap(oldestCandidates, 6, async s => { try { return await getTx(s.signature); } catch { return null; } });
+  const oldestCandidates = sigs.slice(-Math.min(18, sigs.length)).reverse();
+  const oldestTxs = await boundedMap(oldestCandidates, 3, async s => { try { return await getTx(s.signature); } catch { return null; } });
   parsedCount += oldestTxs.filter(Boolean).length;
 
   let creationTx: ParsedTx | null = null;
@@ -352,7 +428,7 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
   let creatorSignaturesInspected = 0;
 
   if (creator) {
-    const funding = await findFundingBefore(creator, creationSig?.blockTime ?? null, creatorPages, 45);
+    const funding = await findFundingBefore(creator, creationSig?.blockTime ?? null, creatorPages, 28);
     creatorSignaturesInspected = funding.signatures;
     parsedCount += funding.parsed;
     if (funding.transfer) {
@@ -367,7 +443,7 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
     const creatorSigs = await getSignatures(creator, creatorPages);
     creatorSignaturesInspected = Math.max(creatorSignaturesInspected, creatorSigs.length);
     const sampled = strategicSample(creatorSigs, historyTxSample);
-    const historyTxs = await boundedMap(sampled, 7, async s => { try { return await getTx(s.signature); } catch { return null; } });
+    const historyTxs = await boundedMap(sampled, 3, async s => { try { return await getTx(s.signature); } catch { return null; } });
     parsedCount += historyTxs.filter(Boolean).length;
     const launchMap = new Map<string, CreatorLaunch>();
     for (const tx of historyTxs) {
@@ -386,7 +462,7 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
 
   // Inspect the oldest token transactions for early participants and creator-adjacent token outflows.
   const earlySigs = sigs.slice(-Math.min(earlyTxSample, sigs.length)).reverse();
-  const earlyTxs = await boundedMap(earlySigs, 7, async s => { try { return await getTx(s.signature); } catch { return null; } });
+  const earlyTxs = await boundedMap(earlySigs, 3, async s => { try { return await getTx(s.signature); } catch { return null; } });
   parsedCount += earlyTxs.filter(Boolean).length;
   const earlyMap = new Map<string, { firstSeen: number | null; signature: string; tokenDelta: number }>();
   for (const tx of earlyTxs) {
@@ -403,10 +479,10 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
     }
   }
 
-  const earlyCandidates = [...earlyMap.entries()].sort((a,b)=>b[1].tokenDelta-a[1].tokenDelta).slice(0,4);
+  const earlyCandidates = [...earlyMap.entries()].sort((a,b)=>b[1].tokenDelta-a[1].tokenDelta).slice(0,3);
   const launchCutoff = creationSig?.blockTime ?? null;
-  const earlyFunding = await boundedMap(earlyCandidates, 3, async ([wallet, info]) => {
-    const f = await findFundingBefore(wallet, launchCutoff, 1, 18).catch(() => ({ transfer: null, signatures: 0, parsed: 0 }));
+  const earlyFunding = await boundedMap(earlyCandidates, 2, async ([wallet, info]) => {
+    const f = await findFundingBefore(wallet, launchCutoff, 1, 10).catch(() => ({ transfer: null, signatures: 0, parsed: 0 }));
     parsedCount += f.parsed;
     return { wallet, info, f };
   });
@@ -430,7 +506,8 @@ export async function analyzeMint(mint: string): Promise<ScanResult> {
     "UNRESOLVED means the available creator intelligence is too incomplete for a low/high risk classification. It does not mean safe.",
     "Holder concentration can include AMM pools, exchange wallets and program-owned accounts.",
     "Early-wallet detection is a bounded sample. Shared funding is evidence of an on-chain relationship, not proof that wallets have the same controller.",
-    "Creator history uses strategic sampling to stay within serverless/RPC limits. A missing historical launch is not evidence that none exists."
+    "Creator history uses strategic sampling to stay within serverless/RPC limits. A missing historical launch is not evidence that none exists.",
+    "RPC calls are paced, retried with backoff, and transaction lookups are de-duplicated to reduce provider rate-limit failures."
   ];
   if (sigs.length >= maxPages * 1000) notes.push("The mint hit the configured signature-page cap, so older activity may exist beyond this scan.");
   if (!process.env.HELIUS_API_KEY?.trim()) notes.push("No Helius key is configured. Public Solana RPC may rate-limit scans and token metadata may be sparse.");
