@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { analyzeMint } from "@/lib/solana";
 import type { ScanResult } from "@/lib/types";
+import { recordObservedScan } from "@/lib/registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
 
     const result = await analyzeMint(mint);
     resultCache.set(mint, { at: Date.now(), result });
+    void recordObservedScan(result);
     return NextResponse.json(result, { headers: { "x-rugprint-cache": "MISS" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Scan failed";

@@ -2,11 +2,11 @@ import Scanner from "@/components/Scanner";
 
 export default function Home() {
   return <main>
-    <header className="topbar"><a className="brand" href="/"><span className="finger">⌁</span>RUGPRINT</a><div className="status"><i/> SOLANA MAINNET</div><a className="github" href="https://github.com/" target="_blank">GitHub ↗</a></header>
+    <header className="topbar"><a className="brand" href="/"><span className="finger">⌁</span>RUGPRINT</a><div className="status"><i/> SOLANA MAINNET</div><a className="github" href="/registry">Risk Index ↗</a></header>
     <section className="hero">
       <div className="kicker">ON-CHAIN CREATOR INTELLIGENCE</div>
       <h1>They can change the name.<br/><span>Not the footprint.</span></h1>
-      <p>Trace launch attribution, creator funding, early-wallet relationships and previous mint activity from evidence the blockchain actually exposes.</p>
+      <p>Search a Solana contract, X username or Pump.fun username, then trace public identity associations into creator wallets, funding paths and previous mint activity. RugPrint now includes a persistent creator-registry architecture and alias-resistant lookup.</p>
       <Scanner />
     </section>
     <section className="principles">
