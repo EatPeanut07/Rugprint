@@ -1,13 +1,7 @@
-# Security policy
+# Security Boundary
 
-RugPrint never needs a seed phrase, wallet private key or signing permission.
+Intelligence/social agents -> decision proposal -> deterministic financial policy -> isolated signer -> Solana.
 
-Report vulnerabilities privately before public disclosure. Do not include private keys, personal data or secrets in reports.
+V5 stops at the proposal layer. It has no private key and cannot sign real transactions.
 
-Deployment checklist:
-- keep provider API keys server-side
-- never prefix secrets with NEXT_PUBLIC_
-- enable provider spend/rate limits
-- rotate exposed keys immediately
-- add application-level rate limiting before a public viral launch
-- do not store social evidence containing private personal data
+Never store seed phrases, private keys, Telegram sessions, X credentials, ADMIN_TOKEN, or signer credentials in GitHub or prompts.
