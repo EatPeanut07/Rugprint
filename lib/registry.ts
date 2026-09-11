@@ -52,33 +52,31 @@ async function supabase(path: string, init?: RequestInit) {
   return text ? JSON.parse(text) : null;
 }
 
-function mapCluster(row: unknown): RegistryCluster {
-  const data = row as Record<string, unknown>;
+function mapCluster(row: any): RegistryCluster {
   return {
-    id: String(data.id),
-    clusterId: String(data.cluster_id),
-    status: data.status as RegistryStatus,
-    headline: data.headline == null ? null : String(data.headline),
-    confidence: Number(data.confidence ?? 0),
-    linkedLaunches: Number(data.linked_launches ?? 0),
-    adverseEvents: Number(data.adverse_events ?? 0),
-    associatedWallets: Number(data.associated_wallets ?? 0),
-    estimatedCreatorExitUsd: data.estimated_creator_exit_usd == null ? null : Number(data.estimated_creator_exit_usd),
-    firstSeen: data.first_seen == null ? null : String(data.first_seen),
-    lastSeen: data.last_seen == null ? null : String(data.last_seen),
-    aliases: Array.isArray(data.aliases) ? (data.aliases as RegistryAlias[]) : [],
-    wallets: Array.isArray(data.wallets) ? (data.wallets as string[]) : [],
-    evidenceCount: Number(data.evidence_count ?? 0),
-    appealStatus: (data.appeal_status ?? "none") as RegistryCluster["appealStatus"],
-    updatedAt: String(data.updated_at ?? "")
+    id: String(row.id),
+    clusterId: String(row.cluster_id),
+    status: row.status,
+    headline: row.headline ?? null,
+    confidence: Number(row.confidence ?? 0),
+    linkedLaunches: Number(row.linked_launches ?? 0),
+    adverseEvents: Number(row.adverse_events ?? 0),
+    associatedWallets: Number(row.associated_wallets ?? 0),
+    estimatedCreatorExitUsd: row.estimated_creator_exit_usd == null ? null : Number(row.estimated_creator_exit_usd),
+    firstSeen: row.first_seen ?? null,
+    lastSeen: row.last_seen ?? null,
+    aliases: Array.isArray(row.aliases) ? row.aliases : [],
+    wallets: Array.isArray(row.wallets) ? row.wallets : [],
+    evidenceCount: Number(row.evidence_count ?? 0),
+    appealStatus: row.appeal_status ?? "none",
+    updatedAt: row.updated_at
   };
 }
 
-export async function listPublicClusters(limit = 100): Promise<RegistryCluster[]> {
+export async function listPublicClusters(limit = 100) {
   if (!configured()) return [] as RegistryCluster[];
   const rows = await supabase(`rugprint_public_clusters?select=*&order=adverse_events.desc,linked_launches.desc,confidence.desc&limit=${Math.min(limit, 250)}`);
-  const clusterRows: unknown[] = Array.isArray(rows) ? rows : [];
-  return clusterRows.map((row: unknown) => mapCluster(row));
+  return (rows || []).map(mapCluster);
 }
 
 export async function lookupRegistry(input: { alias?: string; wallet?: string; clusterId?: string }) {
@@ -87,19 +85,19 @@ export async function lookupRegistry(input: { alias?: string; wallet?: string; c
   const wallet = input.wallet?.trim();
   const clusterId = input.clusterId?.trim().toUpperCase();
   return clusters
-    .map((cluster: RegistryCluster) => {
+    .map(cluster => {
       let bestAliasScore = 0;
       let bestAlias: RegistryAlias | null = null;
       if (alias) for (const candidate of cluster.aliases) {
         const score = aliasSimilarity(alias, candidate.username);
         if (score > bestAliasScore) { bestAliasScore = score; bestAlias = candidate; }
       }
-      const walletMatch = Boolean(wallet && cluster.wallets.some((w: string) => w === wallet));
+      const walletMatch = Boolean(wallet && cluster.wallets.some(w => w === wallet));
       const clusterMatch = Boolean(clusterId && cluster.clusterId.toUpperCase() === clusterId);
       return { cluster, aliasSimilarity: bestAliasScore, matchedAlias: bestAlias, walletMatch, clusterMatch };
     })
-    .filter((x: { cluster: RegistryCluster; aliasSimilarity: number; matchedAlias: RegistryAlias | null; walletMatch: boolean; clusterMatch: boolean }) => x.clusterMatch || x.walletMatch || x.aliasSimilarity >= 72)
-    .sort((a: { cluster: RegistryCluster; aliasSimilarity: number; matchedAlias: RegistryAlias | null; walletMatch: boolean; clusterMatch: boolean }, b: { cluster: RegistryCluster; aliasSimilarity: number; matchedAlias: RegistryAlias | null; walletMatch: boolean; clusterMatch: boolean }) => Number(b.clusterMatch)-Number(a.clusterMatch) || Number(b.walletMatch)-Number(a.walletMatch) || b.aliasSimilarity-a.aliasSimilarity)
+    .filter(x => x.clusterMatch || x.walletMatch || x.aliasSimilarity >= 72)
+    .sort((a,b) => Number(b.clusterMatch)-Number(a.clusterMatch) || Number(b.walletMatch)-Number(a.walletMatch) || b.aliasSimilarity-a.aliasSimilarity)
     .slice(0, 10);
 }
 
