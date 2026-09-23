@@ -14,9 +14,14 @@ export type RegistryCluster = {
   appealStatus: "none" | "open" | "resolved"; updatedAt: string;
 };
 type RegistryRow = Record<string, unknown>;
+
 const endpoint = process.env.SUPABASE_URL?.replace(/\/$/, "");
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 function configured() { return Boolean(endpoint && serviceKey); }
+
 async function supabase(path: string, init?: RequestInit) {
   if (!configured()) throw new Error("RugPrint registry database is not configured yet.");
   const headers = { apikey: serviceKey!, Authorization: `Bearer ${serviceKey!}`, "Content-Type": "application/json",
@@ -25,6 +30,7 @@ async function supabase(path: string, init?: RequestInit) {
   if (!res.ok) throw new Error(`Registry database error (${res.status}): ${await res.text()}`);
   const text = await res.text(); return text ? JSON.parse(text) : null;
 }
+
 function mapCluster(row: RegistryRow): RegistryCluster {
   return {
     id:String(row.id), clusterId:String(row.cluster_id), status:row.status as RegistryStatus,
@@ -39,14 +45,17 @@ function mapCluster(row: RegistryRow): RegistryCluster {
     updatedAt:String(row.updated_at)
   };
 }
+
 function confidenceScore(value?: Confidence) {
   return value === "confirmed" ? 100 : value === "strong" ? 80 : value === "possible" ? 55 : 25;
 }
+
 export async function listPublicClusters(limit=100) {
   if (!configured()) return [] as RegistryCluster[];
   const rows = await supabase(`rugprint_public_clusters?select=*&order=adverse_events.desc,linked_launches.desc,confidence.desc&limit=${Math.min(limit,250)}`);
   return ((rows || []) as RegistryRow[]).map(mapCluster);
 }
+
 export async function lookupRegistry(input:{alias?:string;wallet?:string;clusterId?:string}) {
   const clusters=await listPublicClusters(250), alias=input.alias?.trim(), wallet=input.wallet?.trim(), clusterId=input.clusterId?.trim().toUpperCase();
   return clusters.map((cluster: RegistryCluster) => {
@@ -58,6 +67,7 @@ export async function lookupRegistry(input:{alias?:string;wallet?:string;cluster
   }).filter((x)=>x.clusterMatch||x.walletMatch||x.aliasSimilarity>=72)
     .sort((a,b)=>Number(b.clusterMatch)-Number(a.clusterMatch)||Number(b.walletMatch)-Number(a.walletMatch)||b.aliasSimilarity-a.aliasSimilarity).slice(0,10);
 }
+
 export async function recordObservedScan(scan:ScanResult){
   if(!configured()) return;
   try{ await supabase("rugprint_scan_observations?on_conflict=scan_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({
@@ -66,4 +76,5 @@ export async function recordObservedScan(scan:ScanResult){
     data_confidence:confidenceScore(scan.risk.dataConfidence),previous_launches:scan.previousLaunches.length,evidence:scan.evidence,observed_at:scan.generatedAt
   })}); }catch(error){console.error("RugPrint observation write failed",error);}
 }
+
 export function registryConfigured(){return configured();}
