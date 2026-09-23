@@ -47,11 +47,7 @@ export type ScanResult = {
   generatedAt: string;
   network: "mainnet-beta";
   token: TokenMeta;
-  fingerprint: {
-    clusterId: string;
-    rugDna: string;
-    basis: string[];
-  };
+  fingerprint: { clusterId: string; rugDna: string; basis: string[] };
   creator: {
     wallet: string | null;
     creationSignature: string | null;
@@ -67,6 +63,7 @@ export type ScanResult = {
     score: number;
     label: "LOW" | "GUARDED" | "HIGH" | "SEVERE";
     reasons: string[];
+    dataConfidence?: Confidence;
   };
   coverage: {
     provider: "helius" | "solana-rpc";
