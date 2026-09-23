@@ -1,0 +1,1 @@
+Replace lib/telegram.ts and app/api/telegram/webhook/route.ts in GitHub. After Railway deploys, send /start once to refresh the persistent RugPrint menu.
