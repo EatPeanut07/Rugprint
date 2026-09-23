@@ -1,7 +1,1 @@
-import { NextRequest, NextResponse } from "next/server";
-import { alertAllowance } from "@/lib/alerts";
-export async function GET(req: NextRequest) {
-  const plan = req.nextUrl.searchParams.get("plan") === "pro" ? "pro" : "trial";
-  const used = Math.max(0, Number(req.nextUrl.searchParams.get("used") || 0));
-  return NextResponse.json({ plan, used, ...alertAllowance(plan, used) });
-}
+import{NextResponse}from"next/server";import{quota}from"@/lib/alert-store";export const runtime="nodejs";export async function GET(req:Request){try{const key=new URL(req.url).searchParams.get("userKey")?.trim();if(!key)return NextResponse.json({error:"userKey required"},{status:400});return NextResponse.json(await quota(key));}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Quota lookup failed"},{status:500});}}
