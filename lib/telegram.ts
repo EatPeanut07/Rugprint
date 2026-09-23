@@ -6,3 +6,4 @@ export async function setTelegramWebhook(base:string,secret:string){return teleg
 export async function getTelegramWebhookInfo(){return telegram("getWebhookInfo",{});}
 export async function setTelegramCommands(){return telegram("setMyCommands",{commands:[{command:"start",description:"Open RugPrint menu"},{command:"status",description:"View plan and alert usage"},{command:"testalert",description:"Send a test alert"},{command:"help",description:"How to use RugPrint"}]});}
 export const rugPrintKeyboard={keyboard:[[{text:"🔎 Check Creator"},{text:"🚨 My Alerts"}],[{text:"📊 Status"},{text:"📝 Report Creator"}],[{text:"💎 Upgrade to Pro"},{text:"❓ Help"}]],resize_keyboard:true,is_persistent:true,input_field_placeholder:"Choose a RugPrint action…"};
+export const inlineLink=(label:string,url:string)=>({inline_keyboard:[[{text:label,url}]]});
