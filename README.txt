@@ -1,14 +1,9 @@
-RugPrint classifier release
+RugPrint Release Candidate 1
 
-GitHub change:
-Open lib/intelligence-engine.ts and replace ONLY the existing `isLaunch` and
-`sourceConfidence` definitions with the definitions in CLASSIFIER-PATCH.txt.
+Public creator profiles must use VERIFIED launch observations from Supabase, not regex 'launch signals'.
 
-Do not replace the whole intelligence-engine.ts file.
-
-Do NOT run any database cleanup manually. ChatGPT will handle Supabase after
-the corrected classifier is deployed.
-
-Reason:
-The old expression matched PUMP_FUN anywhere in the transaction summary,
-causing ordinary Pump.fun swaps to be recorded as launches.
+Required changes:
+1. lib/creator-intelligence.ts: query rugprint_launch_observations by creator_wallet and return verifiedLaunchCount + verifiedLaunches.
+2. app/creator/page.tsx: replace 'Launch signals' with 'Verified launches'; list mint, date, source, confidence and evidence transaction.
+3. Never classify a dead/failed token as a rug without additional creator-behaviour evidence.
+4. Database migration is handled by ChatGPT, not manually.
