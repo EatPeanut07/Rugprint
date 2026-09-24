@@ -1,0 +1,26 @@
+// In lib/intelligence-engine.ts replace ONLY the current `isLaunch` and
+// `sourceConfidence` definitions with these versions.
+
+const isLaunch=(x:any)=>{
+  const type=String(x?.type||"").toUpperCase();
+  const source=String(x?.source||"").toUpperCase();
+
+  // A Pump.fun source is NOT itself evidence of a launch.
+  // SWAP / WITHDRAW / UNKNOWN transactions are deliberately excluded.
+  if(type==="CREATE" && source==="PUMP_FUN") return true;
+  if(type==="CREATE" && source==="RAYDIUM_LAUNCHLAB") return true;
+
+  // Explicit mint-creation classifications are accepted independently.
+  if(type==="TOKEN_MINT" || type==="CREATE_MINT") return true;
+
+  return false;
+};
+
+const sourceConfidence=(x:any)=>{
+  const type=String(x?.type||"").toUpperCase();
+  const source=String(x?.source||"").toUpperCase();
+  if(type==="CREATE" && source==="PUMP_FUN") return 95;
+  if(type==="CREATE" && source==="RAYDIUM_LAUNCHLAB") return 90;
+  if(type==="TOKEN_MINT" || type==="CREATE_MINT") return 80;
+  return 0;
+};
