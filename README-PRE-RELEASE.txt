@@ -1,0 +1,1 @@
+Final pre-release bundle. Includes plan-aware Telegram menu and promoter/association evidence foundation. Birdeye is deliberately NOT included and remains post-release. Run RUGPRINT-ASSOCIATIONS-MIGRATION.sql in Supabase. Automated X resolution must use reliable evidence and must never infer creation merely from promotion.
