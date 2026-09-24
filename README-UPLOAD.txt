@@ -1,13 +1,10 @@
-FINAL CODE BUNDLE
+RugPrint STRICT CLASSIFIER release blocker fix.
 
-Upload the CONTENTS of this ZIP to the repository root, preserving folders and replacing existing files.
+Upload the contents to the repository root and replace lib/intelligence-engine.ts.
 
-Changes:
-- creator wallet page now uses strict verified launch observations, not loose regex launch signals
-- creator API returns verified launch count/history from Supabase
-- Alerts page adds the missing Connect Telegram flow using the secure one-time token endpoint
+This is a COMPLETE replacement file, not a text instruction.
 
-Do not upload the enclosing RugPrint-Final-Code folder itself.
-No SQL is required from you.
-
-After upload, ChatGPT will verify Railway, configure/check Telegram, and run release tests.
+Key rule:
+- Pump.fun SWAP, WITHDRAW and UNKNOWN transactions can never become launches merely because source=PUMP_FUN.
+- Accepted launch classifications: CREATE+PUMP_FUN, CREATE+RAYDIUM_LAUNCHLAB, TOKEN_MINT, CREATE_MINT.
+- Do not run database cleanup yourself. ChatGPT will clean contaminated observations only after Railway confirms this exact fix is deployed.
