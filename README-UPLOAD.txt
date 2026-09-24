@@ -1,1 +1,13 @@
-RugPrint launch bundle. Upload the contents preserving folders. Do NOT run the SQL manually; ChatGPT will apply the Supabase migration. This bundle adds automatic on-chain Pro verification, secure one-time Telegram linking backend, accurate active-watch quotas, and reduces historical worker load to avoid timeouts.
+FINAL CODE BUNDLE
+
+Upload the CONTENTS of this ZIP to the repository root, preserving folders and replacing existing files.
+
+Changes:
+- creator wallet page now uses strict verified launch observations, not loose regex launch signals
+- creator API returns verified launch count/history from Supabase
+- Alerts page adds the missing Connect Telegram flow using the secure one-time token endpoint
+
+Do not upload the enclosing RugPrint-Final-Code folder itself.
+No SQL is required from you.
+
+After upload, ChatGPT will verify Railway, configure/check Telegram, and run release tests.
