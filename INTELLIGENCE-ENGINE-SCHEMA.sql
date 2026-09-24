@@ -1,0 +1,14 @@
+create extension if not exists pgcrypto;
+create table if not exists rugprint_backfill_queue (id uuid primary key default gen_random_uuid(),wallet text unique not null,source text not null default 'seed',depth integer not null default 0 check(depth between 0 and 4),status text not null default 'pending' check(status in('pending','processing','complete','retry','failed')),cursor_signature text,pages_processed integer not null default 0,transactions_processed integer not null default 0,launch_signals integer not null default 0,transfer_signals integer not null default 0,swap_signals integer not null default 0,attempts integer not null default 0,next_attempt_at timestamptz,last_error text,first_seen timestamptz not null default now(),last_processed_at timestamptz,updated_at timestamptz not null default now());
+create index if not exists rugprint_backfill_queue_status_idx on rugprint_backfill_queue(status,next_attempt_at,updated_at);
+create table if not exists rugprint_historical_transactions (signature text primary key,wallet text not null,block_time timestamptz,tx_type text,description text,fee bigint,source text,raw_summary jsonb not null default '{}'::jsonb,observed_at timestamptz not null default now());
+create index if not exists rugprint_historical_wallet_idx on rugprint_historical_transactions(wallet,block_time desc);
+create table if not exists rugprint_wallet_relationships (id uuid primary key default gen_random_uuid(),wallet_a text not null,wallet_b text not null,relationship_type text not null,evidence_signature text,confidence integer not null default 25 check(confidence between 0 and 100),evidence_count integer not null default 1,first_seen timestamptz,last_seen timestamptz,reviewed boolean not null default false,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(wallet_a,wallet_b,relationship_type));
+create index if not exists rugprint_relationship_a_idx on rugprint_wallet_relationships(wallet_a);
+create index if not exists rugprint_relationship_b_idx on rugprint_wallet_relationships(wallet_b);
+create table if not exists rugprint_launch_observations (id uuid primary key default gen_random_uuid(),creator_wallet text not null,token_mint text,signature text unique not null,launched_at timestamptz,source text,confidence integer not null default 40 check(confidence between 0 and 100),metadata jsonb not null default '{}'::jsonb,created_at timestamptz not null default now());
+create index if not exists rugprint_launch_creator_idx on rugprint_launch_observations(creator_wallet,launched_at desc);
+alter table rugprint_backfill_queue enable row level security;
+alter table rugprint_historical_transactions enable row level security;
+alter table rugprint_wallet_relationships enable row level security;
+alter table rugprint_launch_observations enable row level security;

@@ -1,0 +1,1 @@
+import{NextResponse}from"next/server";import{intelligenceStats}from"@/lib/intelligence-engine";export const runtime="nodejs";export async function GET(){try{return NextResponse.json({ok:true,...await intelligenceStats()})}catch(e){return NextResponse.json({ok:false,error:e instanceof Error?e.message:"failed"},{status:500})}}
