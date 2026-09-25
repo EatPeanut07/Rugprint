@@ -1,10 +1,11 @@
-RugPrint Release Hardening
+RugPrint Worker Reliability Fix
 
-1. Priority queue for user-requested creator searches.
-2. User searches receive priority 100.
-3. One bounded historical page per worker request to reduce Railway timeout risk.
-4. Every verified launch now receives a matching unclassified outcome row immediately.
-5. Migration backfills missing outcome rows without making unsupported adverse/rug claims.
-6. Fixes community-report discovery status from old 'new' to current 'submitted'.
-
-NO Birdeye changes.
+Release-blocker patch:
+- Reduces each Helius historical batch from 100 transactions to 20.
+- Limits generic counterparty expansion per transaction to 5.
+- Keeps one historical page per worker request.
+- Automatically recovers processing jobs left stale for more than 5 minutes.
+- Keeps customer-search priority ordering.
+- Worker request timeout is 50 seconds, below the route/proxy ceiling.
+- No Birdeye changes.
+- No SQL migration required.
