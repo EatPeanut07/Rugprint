@@ -1,0 +1,6 @@
+RugPrint final pre-release cleanup
+- Telegram return state refreshes on focus/pageshow/visibility.
+- Wallet/contract watches remain ACTIVE; unsupported identity watches show SAVED rather than falsely claiming live monitoring.
+- Routine swap/transfer/wallet alerts are suppressed. Alerts focus on stronger create/mint activity.
+- Backfill worker client timeout raised to 135 seconds and remains recoverable.
+- No Birdeye. No SQL migration.
